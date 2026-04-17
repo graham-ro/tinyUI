@@ -43,12 +43,14 @@ def backdrop(color):
   finally: write(CSI+'[0m', flush=True)
 
 sample_list = [*range(1,100)]
-
+def ListPickerDisplay(lines):
+  pass
 def renderer():
   columns, lines = os.get_terminal_size()
   signal.signal(signal.SIGWINCH, terminal_size_handler)
 
   with screen():
+    ListPickerDisplay()
     for i in range(lines//2): 
       with backdrop(100):
         write(ThickLeft, go_nextline=(i != range(lines//2)), flush=(i != range(lines//2)))
@@ -68,6 +70,8 @@ def renderer():
 
       if char == '\x03' or char == '\x11': # Ctrl+C, Ctrl+Q
         break
+
+
 
 if __name__ == "__main__":
   renderer()
