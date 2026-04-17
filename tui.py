@@ -15,8 +15,8 @@ def write(content:str|None=None, go_next=False, flush=False):
 def get_cursor_position():
   write(CSI+'[6n', flush=True)
   seq = ''.join(iter(lambda: sys.stdin.read(1), 'R')) # \x1b[y;xR
-  coordinates = seq.split('[')[1].split(';')
-  y,x = tuple(map(int, coordinates))
+  coordinates = re.split(r'\[|;', seq)
+  y,x = int(coordinates[1]), int(coordinates[2])
   return x,y
 
 @contextmanager
