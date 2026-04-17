@@ -1,4 +1,4 @@
-import os, sys, time
+import os, sys, time, re
 from contextlib import contextmanager
 
 CSI = '\033' # Control Sequence Introducer
@@ -13,24 +13,22 @@ def write(content:str|None=None, go_next=False, flush=False):
   if flush: sys.stdout.flush()
 
 def get_cursor_position():
-  write(CSI+'[6n]', flush=True)
-  seq = sys.stdin.read(3) # expected: \x1b[y;xR
-  if seq[:3] == ESS:
-    print('Yep')
-  else: print("nope")
-  return 5,5
+  write(CSI+'[6n', flush=True)
+  seq = ''.join(iter(lambda: sys.stdin.read(1), 'R')) + 'R'
+  coordinates = re.search(rf'{ESS}\[(.*?)R', seq)
+  y,x = coordinates.group(1).split(';')
+  return x,y
 
 @contextmanager
 def screen():
   # Switch to non-canonical terminal mode
   os.system("stty raw -echo")
-  # [?1049h: Switch to alternate screen buffer
-  # [H: Move cursor to home (top-left)
+  # Switch to alternate screen buffer, move cursor to home (top-left)
   write(CSI+'[?1049h'+CSI+'[H', flush=True)
 
   try: yield
   finally:
-    # [?1049l: Escape alternate screen buffer
+    # Escape alternate screen buffer
     write(CSI+'[?1049l', flush=True)
     # Return to canonical terminal mode
     os.system("stty cooked echo")
@@ -48,7 +46,7 @@ def renderer():
       with backdrop(100):
         write(ThickLeft, go_next=(i != range(lines//2)), flush=(i != range(lines//2)))
 
-    x, y = get_cursor_position()
+    x,y = get_cursor_position()
 
     while True:
       char = sys.stdin.read(1)
