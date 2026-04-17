@@ -1,16 +1,19 @@
-import os, sys, time, re
+import os, sys, re, signal
 from contextlib import contextmanager
 
 CSI = '\033' # Control Sequence Introducer
 ESS = '\x1b' # Escape Sequence Start
-# https://github.com/junegunn/fzf/blob/master/src/tui/tui.go
 UP, DOWN, RIGHT, LEFT = '[A', '[B', '[C', '[D'
+# https://github.com/junegunn/fzf/blob/master/src/tui/tui.go
 ThickLeft = '▌'
 
-def write(content:str|None=None, go_next=False, flush=False):
-  if go_next: content = content + '\r\n' if content else '\r\n'
+def write(content:str|None=None, go_nextline=False, flush=False):
+  if go_nextline: content = content + '\r\n' if content else '\r\n'
   if content: sys.stdout.write(content)
   if flush: sys.stdout.flush()
+
+def terminal_size_handler():
+  pass # update per specific display
 
 def get_cursor_position():
   write(CSI+'[6n', flush=True)
@@ -39,12 +42,16 @@ def backdrop(color):
   try: yield
   finally: write(CSI+'[0m', flush=True)
 
+sample_list = [*range(1,100)]
+
 def renderer():
   columns, lines = os.get_terminal_size()
+  signal.signal(signal.SIGWINCH, terminal_size_handler())
+
   with screen():
     for i in range(lines//2): 
       with backdrop(100):
-        write(ThickLeft, go_next=(i != range(lines//2)), flush=(i != range(lines//2)))
+        write(ThickLeft, go_nextline=(i != range(lines//2)), flush=(i != range(lines//2)))
 
     x,y = get_cursor_position()
 
