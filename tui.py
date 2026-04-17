@@ -13,7 +13,7 @@ def write(content:str|None=None, go_nextline=False, flush=False):
   if flush: sys.stdout.flush()
 
 def terminal_size_handler():
-  pass # update per specific display
+  return # update per specific display
 
 def get_cursor_position():
   write(CSI+'[6n', flush=True)
@@ -46,7 +46,7 @@ sample_list = [*range(1,100)]
 
 def renderer():
   columns, lines = os.get_terminal_size()
-  signal.signal(signal.SIGWINCH, terminal_size_handler())
+  signal.signal(signal.SIGWINCH, terminal_size_handler)
 
   with screen():
     for i in range(lines//2): 
