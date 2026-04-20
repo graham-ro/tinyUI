@@ -1,9 +1,9 @@
-import os, sys, re, signal
+import os, tty, sys, re, signal, select
 from contextlib import contextmanager
 
 CSI = '\033' # Control Sequence Introducer
-ESS = '\x1b' # Escape Sequence Start
-UP, DOWN, RIGHT, LEFT = '[A', '[B', '[C', '[D'
+ESC, CtrlC, CtrlQ = b'\x1b', b'\x03', b'\x11'
+UP, DOWN, RIGHT, LEFT = b'[A', b'[B', b'[C', b'[D'
 # https://github.com/junegunn/fzf/blob/master/src/tui/tui.go
 ThickLeft = '▌'
 
@@ -23,9 +23,9 @@ def get_cursor_position():
   return x,y
 
 @contextmanager
-def screen():
-  # Switch to non-canonical terminal mode
-  os.system("stty raw -echo")
+def screen(fd):
+  # Switch to non-canonical (raw) terminal mode
+  tty.setraw(fd)
   # Switch to alternate screen buffer, move cursor to home (top-left)
   write(CSI+'[?1049h'+CSI+'[H', flush=True)
 
@@ -33,43 +33,50 @@ def screen():
   finally:
     # Escape alternate screen buffer
     write(CSI+'[?1049l', flush=True)
-    # Return to canonical terminal mode
-    os.system("stty cooked echo")
-
+    
 @contextmanager
 def backdrop(color):
   write(CSI+'['+str(color)+'m')
   try: yield
   finally: write(CSI+'[0m', flush=True)
 
-sample_list = iter(range(1,100))
 def SearchDisplay(height:int):
+  sample_list = iter(range(1,100))
   for line in range(height):
-    write(content=ThickLeft+str(next(sample_list)), go_nextline=line!=height, flush=True)
+    write(content=ThickLeft+" "+str(next(sample_list)), go_nextline=line!=height, flush=True)
+  write(content="  "+"11/12", go_nextline=True, flush=True)
+  write(content="> ", flush=True)
+
 def renderer():
+  fd = sys.stdin.fileno()
   columns, lines = os.get_terminal_size()
   signal.signal(signal.SIGWINCH, terminal_size_handler)
 
-  with screen():
+  with screen(fd):
     SearchDisplay(lines // 5 * 2)
 
     x,y = get_cursor_position()
 
     while True:
-      char = sys.stdin.read(1)
+      char = os.read(fd, 1)
+      if char == ESC:
+        more, _, _ = select.select([fd], [], [], 0) # checks if more bytes in buffer
+        if more:
+          seq = os.read(fd, 2)
+          if seq == UP: y = max(1, y-1)
+          elif seq == DOWN: y = min(lines, y+1)
+          elif seq == RIGHT: x = min(columns, x+1)
+          elif seq == LEFT: x = max(1, x-1)
+          write(CSI+f"[{y};{x}H", flush=True)
+          continue
+        else: break # ESC
 
-      if char == ESS:
-        seq = sys.stdin.read(2)
-        if seq == UP: y = max(1, y-1)
-        elif seq == DOWN: y = min(lines, y+1)
-        elif seq == RIGHT: x = min(columns, x+1)
-        elif seq == LEFT: x = max(1, x-1)
-        write(CSI+f"[{y};{x}H", flush=True)
-
-      if char == '\x03' or char == '\x11': # Ctrl+C, Ctrl+Q
+      if char == CtrlC or char == CtrlQ: # Ctrl+C, Ctrl+Q
         break
-
-
+      
+      # else:
+      #   write(char, flush=True)
+      
 
 if __name__ == "__main__":
   renderer()
